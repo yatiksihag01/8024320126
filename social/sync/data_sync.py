@@ -24,40 +24,33 @@ async def sync_data():
             headers = {"Authorization": f"Bearer {token}"}
 
             async with aiohttp.ClientSession() as session:
-                users_response = await fetch_json(session, f"{BASE_API_URL}/users", headers)
-                users_dict = users_response.get("users", {})
+                response = await fetch_json(session, f"{BASE_API_URL}/users", headers)
+                users_raw = response["users"]
 
-                posts_response = await fetch_json(session, f"{BASE_API_URL}/posts", headers)
-                comments_response = await fetch_json(session, f"{BASE_API_URL}/comments", headers)
-
-                posts = posts_response.get("posts", [])
-                comments = comments_response.get("comments", [])
-
-                users_data.clear()
-                user_posts_map.clear()
-                for user_id_str, username in users_dict.items():
+                for user_id_str, user_name in users_raw.items():
                     user_id = int(user_id_str)
-                    users_data[user_id] = {"id": user_id, "name": username}
+
+                    users_data[user_id] = {
+                        "id": user_id,
+                        "name": user_name
+                    }
                     user_posts_map[user_id] = []
 
-                comment_map = {}
-                for comment in comments:
-                    postid = comment["postid"]
-                    comment_map.setdefault(postid, []).append(comment)
+                    posts = await fetch_json(session, f"{BASE_API_URL}/users/{user_id}/posts", headers)
+                    posts_raw = posts["posts"]
 
-                posts_data.clear()
-                for post in posts:
-                    post_id = post["id"]
-                    user_id = post["userid"]
+                    for post in posts_raw:
+                        post_id = int(post["id"])
 
-                    post["comment_count"] = len(comment_map.get(post_id, []))
-                    post["timestamp"] = datetime.now().isoformat()
+                        comments = await fetch_json(session, f"{BASE_API_URL}/posts/{post_id}/comments", headers)
 
-                    posts_data[post_id] = post
-                    if user_id in user_posts_map:
+                        post["comment_count"] = len(comments)
+                        post["timestamp"] = datetime.now().isoformat()
+
+                        posts_data[post_id] = post
                         user_posts_map[user_id].append(post_id)
 
-            print(f"Fetch completed")
+            print(f"Fetch completed: {len(users_data)} users, {len(posts_data)} posts")
 
         except Exception as e:
             print(f"Fetching failed: {str(e)}")

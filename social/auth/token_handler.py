@@ -31,7 +31,7 @@ async def fetch_access_token():
         }
 
         async with session.post(AUTH_URL, json=payload) as response:
-            if response.status != 200:
+            if response.status != 201:
                 raise Exception(f"Authorization failed: {response.status}")
 
             data = await response.json()
